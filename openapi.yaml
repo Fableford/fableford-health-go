@@ -1,0 +1,303 @@
+openapi: 3.0.3
+info:
+  title: Fableford Health API
+  description: Foundation health and status endpoints standardized across all services
+  version: 0.1.0
+  contact:
+    name: Fableford Health API Support
+    email: support@fableford.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://api.fableford.com
+    description: Production server
+
+paths:
+  /health:
+    get:
+      summary: Get basic health status
+      description: Returns basic health status of the service
+      operationId: getHealth
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: "healthy"
+                timestamp: "2024-01-06T15:04:05Z"
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: "unhealthy"
+                timestamp: "2024-01-06T15:04:05Z"
+
+  /health/live:
+    get:
+      summary: Kubernetes liveness probe
+      description: Endpoint for Kubernetes liveness probe to determine if the service should be restarted
+      operationId: getLiveness
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessResponse'
+              example:
+                alive: true
+                timestamp: "2024-01-06T15:04:05Z"
+        '503':
+          description: Service is not alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessResponse'
+              example:
+                alive: false
+                timestamp: "2024-01-06T15:04:05Z"
+
+  /health/ready:
+    get:
+      summary: Readiness probe with dependency checks
+      description: Endpoint for Kubernetes readiness probe to determine if the service is ready to accept traffic
+      operationId: getReadiness
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+              example:
+                ready: true
+                timestamp: "2024-01-06T15:04:05Z"
+                checks:
+                  database: "connected"
+                  cache: "available"
+                  external_api: "reachable"
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+              example:
+                ready: false
+                timestamp: "2024-01-06T15:04:05Z"
+                checks:
+                  database: "connection failed"
+                  cache: "unavailable"
+                  external_api: "timeout"
+
+  /status:
+    get:
+      summary: Get detailed service information
+      description: Returns detailed information about the service including version, uptime, and configuration
+      operationId: getStatus
+      tags:
+        - Status
+      responses:
+        '200':
+          description: Service status information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+              example:
+                service_name: "fableford-health-service"
+                version: "0.1.0"
+                git_commit: "abc123def456"
+                build_time: "2024-01-06T10:00:00Z"
+                start_time: "2024-01-06T14:00:00Z"
+                uptime_seconds: 3665
+                environment: "production"
+                hostname: "health-service-pod-xyz"
+                dependencies:
+                  - name: "postgres"
+                    status: "healthy"
+                    version: "14.5"
+                  - name: "redis"
+                    status: "healthy"
+                    version: "7.0"
+
+  /metrics:
+    get:
+      summary: Prometheus metrics collection
+      description: Returns service metrics in Prometheus exposition format
+      operationId: getMetrics
+      tags:
+        - Monitoring
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |
+                # HELP http_requests_total Total number of HTTP requests
+                # TYPE http_requests_total counter
+                http_requests_total{method="GET",status="200"} 1234
+                http_requests_total{method="POST",status="201"} 567
+                # HELP http_request_duration_seconds HTTP request latency
+                # TYPE http_request_duration_seconds histogram
+                http_request_duration_seconds_bucket{le="0.005"} 24054
+                http_request_duration_seconds_bucket{le="0.01"} 33444
+                http_request_duration_seconds_bucket{le="0.025"} 100392
+                http_request_duration_seconds_sum 53423
+                http_request_duration_seconds_count 133988
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: ["healthy", "unhealthy"]
+          description: Health status of the service
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of the health check
+          example: "2024-01-06T15:04:05Z"
+
+    LivenessResponse:
+      type: object
+      required:
+        - alive
+        - timestamp
+      properties:
+        alive:
+          type: boolean
+          description: Whether the service is alive
+          example: true
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of the liveness check
+          example: "2024-01-06T15:04:05Z"
+
+    ReadinessResponse:
+      type: object
+      required:
+        - ready
+        - timestamp
+        - checks
+      properties:
+        ready:
+          type: boolean
+          description: Whether the service is ready to accept traffic
+          example: true
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of the readiness check
+          example: "2024-01-06T15:04:05Z"
+        checks:
+          type: object
+          description: Status of individual dependency checks
+          additionalProperties:
+            type: string
+          example:
+            database: "connected"
+            cache: "available"
+            external_api: "reachable"
+
+    StatusResponse:
+      type: object
+      required:
+        - service_name
+        - version
+        - start_time
+        - uptime_seconds
+        - environment
+      properties:
+        service_name:
+          type: string
+          description: Name of the service
+          example: "fableford-health-service"
+        version:
+          type: string
+          description: Version of the service
+          example: "1.0.0"
+        git_commit:
+          type: string
+          description: Git commit hash of the deployed code
+          example: "abc123def456"
+        build_time:
+          type: string
+          format: date-time
+          description: Time when the service was built
+          example: "2024-01-06T10:00:00Z"
+        start_time:
+          type: string
+          format: date-time
+          description: Time when the service started
+          example: "2024-01-06T14:00:00Z"
+        uptime_seconds:
+          type: integer
+          format: int64
+          description: Uptime of the service in seconds
+          example: 3665
+        environment:
+          type: string
+          description: Deployment environment
+          example: "production"
+        hostname:
+          type: string
+          description: Hostname of the service instance
+          example: "health-service-pod-xyz"
+        dependencies:
+          type: array
+          description: List of service dependencies and their status
+          items:
+            $ref: '#/components/schemas/Dependency'
+
+    Dependency:
+      type: object
+      required:
+        - name
+        - status
+      properties:
+        name:
+          type: string
+          description: Name of the dependency
+          example: "postgres"
+        status:
+          type: string
+          description: Status of the dependency
+          example: "healthy"
+        version:
+          type: string
+          description: Version of the dependency
+          example: "14.5"
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Status
+    description: Service status endpoints
+  - name: Monitoring
+    description: Monitoring and metrics endpoints
